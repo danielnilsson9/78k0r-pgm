@@ -1,0 +1,8 @@
+{
+  "profiles": {
+    "78k0r-pgm": {
+      "commandName": "Project",
+      "commandLineArgs": " --com COM12 --input D:\\Projects\\GitHub\\bbshd-fw-private\\bbshd-bldc-fw\\DefaultBuild\\bbshd-bldc-fw.hex"
+    }
+  }
+}

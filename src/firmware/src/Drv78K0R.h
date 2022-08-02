@@ -3,6 +3,8 @@
 class Drv78K0R
 {
 public:
+    const static uint8_t DEVICE_ID_LENGTH = 10;
+
     enum Result 
     {
         ERROR_NONE = 0x06,
@@ -24,12 +26,15 @@ public:
     Result begin();
     void end();
 
+    uint32_t getFlashSize() const;
+    const char* getDeviceId() const;
+
     Result eraseFlash();
 
-    Result beginWrite(uint32_t startAddress, uint32_t len);
-    Result writeFlash(uint8_t* data, uint8_t len);
+    Result beginWrite(uint32_t startAddress, uint32_t endAddress);
+    Result writeFlash(uint8_t* data, uint16_t len);
     Result endWrite();
-    
+ 
 private:
     struct Result2
     {
@@ -37,7 +42,7 @@ private:
         Result b;
     };
 
-    void sendCmd(const uint8_t* buffer, uint8_t length, bool end = true);
+    void sendCmd(const uint8_t* buffer, uint8_t length);
 
     Result readStatusResponse();
     Result2 readStatusResponse2();
@@ -51,6 +56,7 @@ private:
     int _pinReset;
     uint8_t _msgbuf[64];
 
-    uint32_t _endAddress = 0x00;
-    uint32_t _bytesWritten = 0x00;
+    char _deviceId[DEVICE_ID_LENGTH];
+    uint32_t _flashSize = 0;
+    int32_t _bytesLeftToWrite = 0;
 };

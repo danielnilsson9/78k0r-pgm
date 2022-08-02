@@ -40,7 +40,7 @@ static void rxClear()
      while(Serial1.available()) Serial1.read();
 }
 
-static uint8_t checksum(const uint8_t* buf, uint8_t length)
+static uint8_t checksum(const uint8_t* buf, uint16_t length)
 {
 	uint8_t value = 0;
 	for (int i = 0; i < length; i++)
@@ -48,7 +48,7 @@ static uint8_t checksum(const uint8_t* buf, uint8_t length)
 		value += buf[i];  
 	}  
 
-	value += length;  
+	value += (uint8_t)length;  
 	value = ~value + 1;
 
 	return value;
@@ -70,6 +70,8 @@ Drv78K0R::Drv78K0R(int pinFLMD, int pinReset)
     : _pinFLMD(pinFLMD)
     , _pinReset(pinReset)
 {
+    memset(_deviceId, 0, 10);
+
     pinMode(_pinFLMD, OUTPUT);
     pinMode(_pinReset, OUTPUT);
     pinMode(PIN_RX, INPUT);
@@ -163,27 +165,35 @@ void Drv78K0R::end()
     digitalWrite(_pinReset, HIGH);
 }
 
+uint32_t Drv78K0R::getFlashSize() const
+{
+    return _flashSize;
+}
+
+const char* Drv78K0R::getDeviceId() const
+{
+    return _deviceId;
+}
+
 Drv78K0R::Result Drv78K0R::eraseFlash()
 {
-    // chip erase
     uint8_t cmd[] = { 0x20 };
     sendCmd(cmd, sizeof(cmd));
     return readStatusResponse();
 }
 
-Drv78K0R::Result Drv78K0R::beginWrite(uint32_t startAddress, uint32_t len)
+Drv78K0R::Result Drv78K0R::beginWrite(uint32_t startAddress, uint32_t endAddress)
 {
-    _endAddress = startAddress + len;
-    _bytesWritten = 0;
+    _bytesLeftToWrite = endAddress - startAddress;
 
     uint8_t cmd[] = { 
         0x40, 
         (uint8_t)(startAddress >> 16), 
         (uint8_t)(startAddress >> 8),
         (uint8_t)startAddress,
-        (uint8_t)(_endAddress >> 16),
-        (uint8_t)(_endAddress >> 8),
-        (uint8_t)_endAddress
+        (uint8_t)(endAddress >> 16),
+        (uint8_t)(endAddress >> 8),
+        (uint8_t)endAddress
     };
 
     sendCmd(cmd, sizeof(cmd));
@@ -191,11 +201,28 @@ Drv78K0R::Result Drv78K0R::beginWrite(uint32_t startAddress, uint32_t len)
     return readStatusResponse();
 }
 
-Drv78K0R::Result Drv78K0R::writeFlash(uint8_t* data, uint8_t len)
+Drv78K0R::Result Drv78K0R::writeFlash(uint8_t* data, uint16_t len)
 {
-    _bytesWritten += len;
+    if (len > 256)
+    {
+        return ERROR_INVALID_PARAMETER;
+    }
 
-    sendCmd(data, len, _bytesWritten == _endAddress);
+    _bytesLeftToWrite -= len;
+
+    bool isLast = _bytesLeftToWrite <= 0;
+
+    txEnable(true);
+
+    Serial1.write(STX);
+    Serial1.write((uint8_t)len);
+    Serial1.write(data, len);
+	Serial1.write(checksum(data, len));
+    Serial1.write(isLast ? ETX : ETB);
+
+    txEnable(false); // forces tx flush 
+    rxClear();
+
     Result2 res = readStatusResponse2();
 
     if (res.a != ERROR_NONE)
@@ -217,38 +244,15 @@ Drv78K0R::Result Drv78K0R::endWrite()
 }
 
 
-void Drv78K0R::sendCmd(const uint8_t* buffer, uint8_t length, bool end)
+void Drv78K0R::sendCmd(const uint8_t* buffer, uint8_t length)
 {
     txEnable(true);
 
-    //SerialUSB.print("TX: ");
-
     Serial1.write(SOH);
-    //printHex(SOH);
-
     Serial1.write(length);
-    //printHex(length);
-
-    for (uint8_t i = 0; i < length; i++)
-	{
-		Serial1.write(buffer[i]);
-        //printHex(buffer[i]);
-	}
+    Serial1.write(buffer, length);
 	Serial1.write(checksum(buffer, length));
-    //printHex(checksum(buffer, length));
-
-    if (end)
-    {
-        Serial1.write(ETX);
-        //printHex(ETX);
-    }
-	else
-    {
-        Serial1.write(ETB);
-        //printHex(ETB);
-    }
-
-    //SerialUSB.println();
+    Serial1.write(ETX);
 
     txEnable(false); // forces tx flush 
     rxClear();
@@ -260,13 +264,6 @@ Drv78K0R::Result Drv78K0R::readStatusResponse()
 {
     if (readResponse() == 5)
     {
-        if (_msgbuf[2] != ERROR_NONE)
-        {
-            //SerialUSB.println("Error: ");
-            //printHex(_msgbuf[2]);
-            //SerialUSB.println();
-        }
-
         return (Result)_msgbuf[2];
     }
 
@@ -277,23 +274,6 @@ Drv78K0R::Result2 Drv78K0R::readStatusResponse2()
 {
     if (readResponse() == 6)
     {
-        if (_msgbuf[2] != ERROR_NONE || _msgbuf[3] != ERROR_NONE)
-        {
-            if (_msgbuf[2] != ERROR_NONE)
-            {
-                //SerialUSB.println("Error(A): ");
-                //printHex(_msgbuf[2]);
-            }
-            
-            if (_msgbuf[3] != ERROR_NONE)
-            {
-                //SerialUSB.println("Error(B): ");
-                //printHex(_msgbuf[3]);
-            }
-            
-            //SerialUSB.println();
-        }
-
         return { (Result)_msgbuf[2], (Result)_msgbuf[3] };
     }
 
@@ -307,21 +287,17 @@ Drv78K0R::Result Drv78K0R::readSiliconSignatureResponse()
     {
         uint8_t len = readResponse();
 
-        if (len == 31)
+        if (len == 28)
         {
-            // SerialUSB.print("Signature: ");
-            // if (_msgbuf[2] == 0x10)
-            // {
-            //     SerialUSB.print("NEC ");
-            // }
-            // SerialUSB.write(&_msgbuf[11], 10);
+            _flashSize = (((uint32_t)_msgbuf[9]) << 16 | ((uint32_t)_msgbuf[8]) << 8 | _msgbuf[7]) + 1;
+            memcpy(_deviceId, &_msgbuf[10], 10);
 
-            // uint32_t flashSize = (((uint32_t)_msgbuf[8]) << 16 | ((uint32_t)_msgbuf[9]) << 8 | _msgbuf[10]);
-            // SerialUSB.print(" Flash: ");
-            // SerialUSB.print(flashSize);
-            // SerialUSB.print(" bytes");
-
-            // SerialUSB.println();
+            return ERROR_NONE;
+        }
+        else if (len == 31) // 79F9211 response, should have been 28 according to documentation ?!
+        {
+            _flashSize = (((uint32_t)_msgbuf[10]) << 16 | ((uint32_t)_msgbuf[9]) << 8 | _msgbuf[8]) + 1; 
+            memcpy(_deviceId, &_msgbuf[11], 10);
 
             return ERROR_NONE;
         }
@@ -385,7 +361,7 @@ uint8_t Drv78K0R::readResponse()
 
     //SerialUSB.println();
 
-    delay(1);
+    delayMicroseconds(200);
 
     if (err)
     {
