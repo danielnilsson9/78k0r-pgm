@@ -46,9 +46,7 @@ private:
 
     Result readStatusResponse();
     Result2 readStatusResponse2();
-    
     Result readSiliconSignatureResponse();
-
     uint8_t readResponse();
 
 private:

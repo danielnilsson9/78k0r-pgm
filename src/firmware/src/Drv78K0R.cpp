@@ -43,7 +43,7 @@ static void rxClear()
 static uint8_t checksum(const uint8_t* buf, uint16_t length)
 {
 	uint8_t value = 0;
-	for (int i = 0; i < length; i++)
+	for (uint16_t i = 0; i < length; i++)
 	{
 		value += buf[i];  
 	}  
@@ -53,16 +53,6 @@ static uint8_t checksum(const uint8_t* buf, uint16_t length)
 
 	return value;
 }
-
-// static void printHex(uint8_t value)
-// {
-//      if (value < 16)
-//     {
-//         SerialUSB.print('0');
-//     }
-//     SerialUSB.print(value, HEX);
-//     SerialUSB.print(' ');
-// }
 
 
 
@@ -315,8 +305,6 @@ uint8_t Drv78K0R::readResponse()
 {
     uint32_t now = millis();
 
-    //SerialUSB.print("RX: ");
-
     uint8_t i = 0;
     uint8_t len = sizeof(_msgbuf);
     bool err = false;
@@ -325,11 +313,8 @@ uint8_t Drv78K0R::readResponse()
         int b = Serial1.read();
         if (!err && b != -1)
         {
-            //printHex(b);
-
             if (i == 0 && b != STX)
             {
-                //SerialUSB.print("Frame does not start with STX");
                 err = true;
             }
             else if (i == 1)
@@ -341,8 +326,6 @@ uint8_t Drv78K0R::readResponse()
                 uint8_t ch = checksum(_msgbuf + 2, len);
                 if (ch != (uint8_t)b)
                 {
-                    //SerialUSB.print("Checksum Error, expected ");
-                    //printHex(ch);
                     err = true;
                 }
             }
@@ -350,7 +333,6 @@ uint8_t Drv78K0R::readResponse()
             {
                 if (b != ETX)
                 {
-                    //SerialUSB.print("Unexpected end of message, expected ETX");
                     err = true;
                 }
             }
@@ -359,11 +341,9 @@ uint8_t Drv78K0R::readResponse()
         }
     }
 
-    //SerialUSB.println();
+    delayMicroseconds(64);
 
-    delayMicroseconds(200);
-
-    if (err)
+    if (err || i < (len + 4))
     {
         return 0;
     }

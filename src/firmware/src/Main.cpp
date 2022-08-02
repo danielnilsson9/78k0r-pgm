@@ -194,7 +194,7 @@ void processWriteBeginCmd()
     res = drv78k0r.beginWrite(startAddr, endAddr);
     if (res != Drv78K0R::ERROR_NONE)
     {
-       writeStatusResponse(res);
+        writeStatusResponse(res);
     }
     else
     {
