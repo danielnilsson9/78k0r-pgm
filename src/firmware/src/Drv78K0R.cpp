@@ -48,7 +48,7 @@ static void txEnable(bool enable)
 
 static void rxClear()
 {
-     while(Serial1.available()) Serial1.read();
+     while (Serial1.available()) Serial1.read();
 }
 
 static uint8_t checksum(const uint8_t* buf, uint16_t length)
@@ -182,10 +182,10 @@ Drv78K0R::Result Drv78K0R::beginWrite(uint32_t startAddress, uint32_t endAddress
         0x40, 
         (uint8_t)(startAddress >> 16), 
         (uint8_t)(startAddress >> 8),
-        (uint8_t)startAddress,
+        (uint8_t)(startAddress),
         (uint8_t)(endAddress >> 16),
         (uint8_t)(endAddress >> 8),
-        (uint8_t)endAddress
+        (uint8_t)(endAddress)
     };
 
     sendCmd(cmd, sizeof(cmd));
@@ -342,7 +342,7 @@ uint8_t Drv78K0R::readResponse(uint32_t timeout_ms)
         }
     }
 
-    delayMicroseconds(145);
+    delayMicroseconds(TFD3);
 
     if (err || i < (len + 4))
     {
