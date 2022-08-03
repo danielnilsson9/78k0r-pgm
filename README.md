@@ -1,12 +1,6 @@
 # 78k0r-pgm
 Arduino based Renesas 78K0R microcontroller programmer.
 
-**NOTE:**  
-This programmer has only been tested on NEC D79F9211 which I suspect is equivalent to Renesas UPD78F1000. I don't know if I have an original NEC MCU or if it's a chinese clone. A few commands such as baudrate change and silicone signature does not return the expected response. Silicon signature has a few extra bytes compared to specification document and the baudrate change command does not seem to work at all causing us to be stuck at 9600 buad.
-
-I do not know if this is compatible with the modern Renesas 78K0R series MCU:s, if not, then minor adjustments may be needed.
-
-
 ## Usage
 You will need an Arduino board with > 1 Serial port to run this flashing firmware.
 Arduino Micro was used during the development of this project which has one physical UART and another virtual port on the USB connection.
@@ -31,3 +25,9 @@ Initiate flash operation using:
 ```
 78k0r-pgm.exe --com COM7 --input program.hex
 ```
+
+
+## Disclaimer
+This programmer has only been tested on NEC D79F9211 which I suspect is equivalent to Renesas UPD78F1000. I don't know if I have an original NEC MCU or if it's soem form of clone. A few commands such as baudrate change and silicone signature does not return the expected response. Silicon signature has a few extra bytes compared to the specification document and the baudrate change command does not work at all causing the programmering interface to be stuck at 9600 buad (which is good enough).
+
+I do not know if this flash tool is compatible with the modern Renesas 78K0R series MCU:s, if not, then minor adjustments may be needed.
