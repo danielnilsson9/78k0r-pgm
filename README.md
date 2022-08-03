@@ -24,5 +24,5 @@ You can change the pins in firmware/Config.h if needed.
 
 Initiate flash operation using:
 ```
-78k0r-pgm.exe --com COM7 -input program.hex
+78k0r-pgm.exe --com COM7 --input program.hex
 ```
