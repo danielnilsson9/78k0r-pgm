@@ -1,4 +1,7 @@
-﻿using System.IO.Ports;
+﻿using System;
+using System.Collections.Generic;
+using System.IO;
+using System.IO.Ports;
 
 namespace _78k0r_pgm.Model
 {

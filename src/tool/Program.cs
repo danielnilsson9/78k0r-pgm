@@ -1,6 +1,7 @@
 ﻿using _78k0r_pgm.Model;
 using System;
 using System.CommandLine;
+using System.IO;
 
 namespace _78k0r_pgm
 {

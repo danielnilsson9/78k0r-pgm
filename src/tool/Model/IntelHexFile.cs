@@ -1,4 +1,9 @@
-﻿namespace _78k0r_pgm.Model
+﻿using System;
+using System.Collections.Generic;
+using System.IO;
+using System.Linq;
+
+namespace _78k0r_pgm.Model
 {
 	public class IntelHexFile
 	{
