@@ -18,8 +18,8 @@ You need to make the following connections to the Renesas MCU.
 
 TOOL0 -> RX & TX of Serial (Connect to both joining them together)  
 RESET -> D9  
-FLMD  -> D10
-GND -> GND
+FLMD  -> D10  
+GND -> GND  
 5V -> 5V (Only if Renesas MCU is not powered by other circuit)
 
 You can change the pins in firmware/Config.h if needed.
