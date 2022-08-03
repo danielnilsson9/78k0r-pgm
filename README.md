@@ -28,6 +28,6 @@ Initiate flash operation using:
 
 
 ## Disclaimer
-This programmer has only been tested on NEC D79F9211 which I suspect is equivalent to Renesas UPD78F1000. I don't know if I have an original NEC MCU or if it's soem form of clone. A few commands such as baudrate change and silicone signature does not return the expected response. Silicon signature has a few extra bytes compared to the specification document and the baudrate change command does not work at all causing the programmering interface to be stuck at 9600 buad (which is good enough).
-
 I do not know if this flash tool is compatible with the modern Renesas 78K0R series MCU:s, if not, then minor adjustments may be needed.
+
+This programmer has only been tested on NEC D79F9211 which I suspect is equivalent to Renesas UPD78F1000. I don't know if I have an original NEC MCU or if it's some  form of clone. A few commands such as baudrate change and silicone signature does not return the expected response. Silicon signature has a few extra bytes compared to the specification document and the baudrate change command does not work at all causing the programmering interface to be stuck at 9600 buad (which is good enough).
