@@ -45,12 +45,15 @@
 #define RSP_INIT        0x12
 
 
-#define STATUS_OK                       0x00
-#define STATUS_ERROR_TIMEOUT            0x01
-#define STATUS_ERROR_ERASE              0x02
-#define STATUS_ERROR_WRITE              0x03
-#define STATUS_ERROR_VERIFY             0x04
-#define STATUS_ERROR_INVALID_PARAM      0x05
+#define STATUS_OK                       0
+#define STATUS_ERROR_UNKNOWN            1
+#define STATUS_ERROR_TIMEOUT            2
+#define STATUS_ERROR_WRITE              3
+#define STATUS_ERROR_VERIFY             4
+#define STATUS_ERROR_INVALID_PARAM      5
+#define STATUS_ERROR_PROTECTED          6
+#define STATUS_ERROR_COMFAIL            7
+#define STATUS_ERROR_BUSY               8
 
 
 #define PIN_RESET       9
@@ -63,20 +66,49 @@ void setup()
 {
     pinMode(LED_BUILTIN, OUTPUT);
 
-    Serial.begin(115200);
+    Serial.begin(9600);
     while(!Serial);
 }
 
+
+uint8_t convertError(Drv78K0R::Result res)
+{
+    switch (res)
+    {
+    case Drv78K0R::Result::ERROR_NONE:
+        return STATUS_OK;
+    case Drv78K0R::Result::ERROR_TIMEOUT:
+        return STATUS_ERROR_TIMEOUT;
+    case Drv78K0R::Result::ERROR_INVALID_PARAMETER:
+        return STATUS_ERROR_INVALID_PARAM;
+    case Drv78K0R::Result::ERROR_VERIFY:
+    case Drv78K0R::Result::ERROR_ERASE_VERIFY:
+    case Drv78K0R::Result::ERROR_INTERNAL_VERIFY:
+        return STATUS_ERROR_VERIFY;
+    case Drv78K0R::Result::ERROR_PROTECTED:
+        return STATUS_ERROR_PROTECTED;
+    case Drv78K0R::Result::ERROR_NOT_ACCEPTED:
+        return STATUS_ERROR_COMFAIL;
+    case Drv78K0R::Result::ERROR_WRITE:
+        return STATUS_ERROR_WRITE;
+    case Drv78K0R::Result::ERROR_BUSY:
+        return STATUS_ERROR_BUSY;
+    default: 
+        // Map rest of errors to unknown, should not happen, 
+        // would be programming error.
+        return STATUS_ERROR_UNKNOWN;
+    }
+}
 
 uint8_t receiveCmd()
 {
     uint32_t lastRecv = millis();
 
-    uint8_t i = 0;
+    uint16_t i = 0;
     uint16_t len = 0;
     bool err = false;
 
-    while(i < (len + 4) && millis() - lastRecv < 1000)
+    while(i < (len + 4) /* && millis() - lastRecv < 1000 */)
     {
         int b = Serial.read();
 
@@ -154,15 +186,7 @@ void writeInitResponse(uint8_t err)
 void processInitCmd()
 {
     Drv78K0R::Result res = drv78k0r.begin();
-
-    if (res == Drv78K0R::ERROR_NONE)
-    {
-        writeInitResponse(STATUS_OK);     
-    } 
-    else
-    {
-        writeInitResponse(STATUS_ERROR_TIMEOUT);
-    }
+    writeInitResponse(convertError(res));     
 }
 
 void processResetCmd()
@@ -174,14 +198,7 @@ void processResetCmd()
 void processEraseCmd()
 {
     Drv78K0R::Result res = drv78k0r.eraseFlash();
-    if (res == Drv78K0R::ERROR_NONE)
-    {
-        writeStatusResponse(STATUS_OK);      
-    }
-    else
-    {
-        writeStatusResponse(STATUS_ERROR_ERASE);
-    }
+    writeStatusResponse(convertError(res));
 }
 
 void processWriteBeginCmd()
@@ -192,14 +209,7 @@ void processWriteBeginCmd()
     Drv78K0R::Result res;
     
     res = drv78k0r.beginWrite(startAddr, endAddr);
-    if (res != Drv78K0R::ERROR_NONE)
-    {
-        writeStatusResponse(res);
-    }
-    else
-    {
-        writeStatusResponse(STATUS_OK);
-    }
+    writeStatusResponse(convertError(res));
 }
 
 void processWriteDataCmd()
@@ -207,27 +217,13 @@ void processWriteDataCmd()
     uint16_t len = (((uint16_t)rxbuf[1] << 8) | rxbuf[2]) - 1;
 
     Drv78K0R::Result res = drv78k0r.writeFlash(&rxbuf[4], len);
-    if (res != Drv78K0R::ERROR_NONE)
-    {
-        writeStatusResponse(res);
-    }
-    else
-    {
-        writeStatusResponse(STATUS_OK);  
-    }
+    writeStatusResponse(convertError(res));
 }
 
 void processWriteEndCmd()
 {
     Drv78K0R::Result res = drv78k0r.endWrite();
-    if (res != Drv78K0R::ERROR_NONE)
-    {
-        writeStatusResponse(STATUS_ERROR_VERIFY);
-    }
-    else
-    {
-        writeStatusResponse(STATUS_OK);
-    }
+    writeStatusResponse(convertError(res));
 }
 
 void loop()

@@ -57,29 +57,31 @@ namespace _78k0r_pgm
                 con.EraseFlash();
 
                 Console.WriteLine("Writing Flash");
- 
-                uint numBlocks = (uint)memory.Length / con.BlockSize;
+
+                DateTime start = DateTime.UtcNow;
 
                 int bytesWritten = 0;
-                for (uint block = 0; block < numBlocks; ++block)
-				{
-                    con.WriteFlashBegin(block * con.BlockSize, ((block + 1) * con.BlockSize) - 1);
+                con.WriteFlashBegin(0x00, con.FlashSize - 1);
 
-                    int bytesLeftInBlock = (int)con.BlockSize;
-                    while (bytesLeftInBlock > 0)
-                    {
-                        int bytesToWrite = Math.Min(128, bytesLeftInBlock);
+                int bytesLeftToWrite = memory.Length;
+                while (bytesLeftToWrite > 0)
+                {
+                    int bytesToWrite = Math.Min(256, bytesLeftToWrite);
 
-                        con.WriteFlashData(memory, bytesWritten, bytesToWrite);
+                    con.WriteFlashData(memory, bytesWritten, bytesToWrite);
 
-                        bytesLeftInBlock -= bytesToWrite;
-                        bytesWritten += bytesToWrite;
+                    bytesLeftToWrite -= bytesToWrite;
+                    bytesWritten += bytesToWrite;
 
-                        Console.WriteLine("Bytes Written: {0}/{1}", bytesWritten, memory.Length);
-                    }
+                    DateTime end = DateTime.UtcNow;
+                    TimeSpan timeDiff = end - start;
 
-                    con.WriteFlashEnd();
+                    Console.WriteLine("Bytes Written: {0}/{1} ({2:0.00}s)", bytesWritten, memory.Length, timeDiff.TotalSeconds);
                 }
+
+                Console.WriteLine("Verifying");
+                con.WriteFlashEnd();
+                Console.WriteLine("OK");
 
                 Disconnect(con);
             }

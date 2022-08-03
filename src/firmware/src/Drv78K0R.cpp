@@ -3,14 +3,25 @@
 #include <Arduino.h>
 
 
-#define PIN_RX      0
-#define PIN_TX      1
+#define PIN_RX          0
+#define PIN_TX          1
 
-#define ETX         0x03
-#define SOH         0x01
-#define STX         0x02
-#define ETB         0x17
+#define ETX             0x03
+#define SOH             0x01
+#define STX             0x02
+#define ETB             0x17
 
+#define BLOCK_SIZE      1024
+
+#define TWT_DEFAULT     3000    // Default timeout if nothing else specified
+
+#define TWT1_MAX_BASE   1112    // Chip erase fixed timeout
+#define TWT1_MAX_BLOCK  141     // Chip erase timeout per block
+
+#define TWT4_MAX        100     // Write timeout, 47.2 according to doc but doesn't work using slow baudrate
+#define TWT5_MAX        860     // Verify timeout per block
+
+#define TFD3            145     // microseconds
 
 #ifndef cbi
 #define cbi(sfr, bit) (_SFR_BYTE(sfr) &= ~_BV(bit))
@@ -99,7 +110,7 @@ Drv78K0R::Result Drv78K0R::begin()
     {
         uint8_t cmd[] = { 0x00 };
         sendCmd(cmd, sizeof(cmd));
-        readStatusResponse();
+        readStatusResponse(TWT_DEFAULT);
     }
 
     delay(13);
@@ -110,7 +121,7 @@ Drv78K0R::Result Drv78K0R::begin()
         uint8_t buffer[] = { 0x9a, 0x00, 0x00, 0x0a, 0x00 };
         sendCmd(buffer, sizeof(buffer));
 
-        delayMicroseconds(100);
+        delayMicroseconds(TFD3);
 
         Serial1.begin(115200);
         rxClear();
@@ -119,17 +130,7 @@ Drv78K0R::Result Drv78K0R::begin()
         {
             uint8_t buffer1[] = { 0x00 };
             sendCmd(buffer1, sizeof(buffer1));
-            readResponse();
-
-            delay(10);
-
-            sendCmd(buffer1, sizeof(buffer1));
-            readResponse();
-
-            delay(10);
-
-            sendCmd(buffer1, sizeof(buffer1));
-            readResponse();
+            readResponse(TWT_DEFAULT);
         }
     }*/
 
@@ -169,12 +170,13 @@ Drv78K0R::Result Drv78K0R::eraseFlash()
 {
     uint8_t cmd[] = { 0x20 };
     sendCmd(cmd, sizeof(cmd));
-    return readStatusResponse();
+    return readStatusResponse(TWT1_MAX_BASE + TWT1_MAX_BLOCK * (_flashSize / BLOCK_SIZE));
 }
 
 Drv78K0R::Result Drv78K0R::beginWrite(uint32_t startAddress, uint32_t endAddress)
 {
     _bytesLeftToWrite = endAddress - startAddress;
+    _blockToWrite = _bytesLeftToWrite / 1024;
 
     uint8_t cmd[] = { 
         0x40, 
@@ -188,7 +190,7 @@ Drv78K0R::Result Drv78K0R::beginWrite(uint32_t startAddress, uint32_t endAddress
 
     sendCmd(cmd, sizeof(cmd));
 
-    return readStatusResponse();
+    return readStatusResponse(TWT_DEFAULT);
 }
 
 Drv78K0R::Result Drv78K0R::writeFlash(uint8_t* data, uint16_t len)
@@ -213,7 +215,7 @@ Drv78K0R::Result Drv78K0R::writeFlash(uint8_t* data, uint16_t len)
     txEnable(false); // forces tx flush 
     rxClear();
 
-    Result2 res = readStatusResponse2();
+    Result2 res = readStatusResponse2(TWT4_MAX);
 
     if (res.a != ERROR_NONE)
     {
@@ -230,7 +232,7 @@ Drv78K0R::Result Drv78K0R::writeFlash(uint8_t* data, uint16_t len)
 Drv78K0R::Result Drv78K0R::endWrite()
 {
     // read verify data frame
-    return readStatusResponse();
+    return readStatusResponse(_blockToWrite * TWT5_MAX);
 }
 
 
@@ -249,10 +251,9 @@ void Drv78K0R::sendCmd(const uint8_t* buffer, uint8_t length)
 }
 
 
-
-Drv78K0R::Result Drv78K0R::readStatusResponse()
+Drv78K0R::Result Drv78K0R::readStatusResponse(uint32_t timeout_ms)
 {
-    if (readResponse() == 5)
+    if (readResponse(timeout_ms) == 5)
     {
         return (Result)_msgbuf[2];
     }
@@ -260,9 +261,9 @@ Drv78K0R::Result Drv78K0R::readStatusResponse()
     return ERROR_TIMEOUT;
 }
 
-Drv78K0R::Result2 Drv78K0R::readStatusResponse2()
+Drv78K0R::Result2 Drv78K0R::readStatusResponse2(uint32_t timeout_ms)
 {
-    if (readResponse() == 6)
+    if (readResponse(timeout_ms) == 6)
     {
         return { (Result)_msgbuf[2], (Result)_msgbuf[3] };
     }
@@ -272,10 +273,10 @@ Drv78K0R::Result2 Drv78K0R::readStatusResponse2()
 
 Drv78K0R::Result Drv78K0R::readSiliconSignatureResponse()
 {
-    Result res = readStatusResponse();
+    Result res = readStatusResponse(TWT_DEFAULT);
     if (res == ERROR_NONE)
     {
-        uint8_t len = readResponse();
+        uint8_t len = readResponse(TWT_DEFAULT);
 
         if (len == 28)
         {
@@ -301,14 +302,14 @@ Drv78K0R::Result Drv78K0R::readSiliconSignatureResponse()
 }
 
 
-uint8_t Drv78K0R::readResponse()
+uint8_t Drv78K0R::readResponse(uint32_t timeout_ms)
 {
     uint32_t now = millis();
 
     uint8_t i = 0;
     uint8_t len = sizeof(_msgbuf);
     bool err = false;
-    while(i < (len + 4) && millis() - now < 3000)
+    while(i < (len + 4) && millis() - now < timeout_ms)
     {
         int b = Serial1.read();
         if (!err && b != -1)
@@ -341,7 +342,7 @@ uint8_t Drv78K0R::readResponse()
         }
     }
 
-    delayMicroseconds(64);
+    delayMicroseconds(145);
 
     if (err || i < (len + 4))
     {

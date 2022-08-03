@@ -44,10 +44,10 @@ private:
 
     void sendCmd(const uint8_t* buffer, uint8_t length);
 
-    Result readStatusResponse();
-    Result2 readStatusResponse2();
+    Result readStatusResponse(uint32_t timeout_ms);
+    Result2 readStatusResponse2(uint32_t timeout_ms);
     Result readSiliconSignatureResponse();
-    uint8_t readResponse();
+    uint8_t readResponse(uint32_t timeout_ms);
 
 private:
     int _pinFLMD;
@@ -56,5 +56,6 @@ private:
 
     char _deviceId[DEVICE_ID_LENGTH];
     uint32_t _flashSize = 0;
+    int32_t _blockToWrite = 0;
     int32_t _bytesLeftToWrite = 0;
 };

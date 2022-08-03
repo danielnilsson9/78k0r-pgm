@@ -6,11 +6,15 @@ namespace _78k0r_pgm.Model
 	{
 		private enum Status
 		{
-			Ok = 0x00,
-			ErrorTimeout = 0x01,
-			ErrorErase = 0x02,
-			ErrorWrite= 0x03,
-			ErrorVerify = 0x04
+			Ok = 0,
+			ErrorUnknown = 1,
+			ErrorTimeout = 2,
+			ErrorWrite = 3,
+			ErrorVerify = 4,
+			ErrorInvalidParmam = 5,
+			ErrorProtected = 6,
+			ErrorComFailure = 7,
+			ErrorBusy = 8
 		}
 
 		private static byte Stx = 0xf1;
@@ -44,14 +48,17 @@ namespace _78k0r_pgm.Model
 		public Connection(string comPort)
 		{
 			DeviceId = "";
-			_port = new SerialPort(comPort, 115200, Parity.None, 8, StopBits.One);
+			_port = new SerialPort(comPort, 9600, Parity.None, 8, StopBits.One);
 			_port.Handshake = Handshake.None;
 			_port.DtrEnable = true; // Needed for USB CDC ?!
 			_port.RtsEnable = true; // Needed for USB CDC ?!
-			_port.ReadTimeout = 5000;
-			_port.WriteTimeout = 5000;
+			_port.ReadTimeout = 60000;
+			_port.WriteTimeout = 10000;
 
 			_port.Open();
+			
+			// dump existing cached data if any
+			_port.ReadExisting();
 		}
 
 		public void Connect()
@@ -210,14 +217,22 @@ namespace _78k0r_pgm.Model
 			{
 				case Status.Ok:
 					return;
+				case Status.ErrorUnknown:
+					throw new Exception("Unknown Error.");
 				case Status.ErrorTimeout:
 					throw new Exception("Operation Timeout.");
-				case Status.ErrorErase:
-					throw new Exception("Erase operation failed.");
 				case Status.ErrorWrite:
 					throw new Exception("Write operation failed.");
 				case Status.ErrorVerify:
 					throw new Exception("Verify operation failed.");
+				case Status.ErrorInvalidParmam:
+					throw new Exception("Invalid Parameter supplied.");
+				case Status.ErrorProtected:
+					throw new Exception("Microcontrolelr is write protected.");
+				case Status.ErrorComFailure:
+					throw new Exception("Comuninication failure with microcontroller.");
+				case Status.ErrorBusy:
+					throw new Exception("Microcontroller is busy.");
 				default:
 					throw new Exception("Unknown error: " + status.ToString());
 			}
