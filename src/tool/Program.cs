@@ -13,7 +13,7 @@ namespace _78k0r_pgm
 
             Console.WriteLine(comPort + " is Open");
 
-            Console.WriteLine("Connecting to Programmer");
+            Console.WriteLine("Connecting Programmer");
             con.Connect();
             Console.WriteLine(String.Format("Connected to {0}, flash size is {1} bytes", con.DeviceId, con.FlashSize));
 
@@ -76,9 +76,13 @@ namespace _78k0r_pgm
                     DateTime end = DateTime.UtcNow;
                     TimeSpan timeDiff = end - start;
 
-                    Console.WriteLine("Bytes Written: {0}/{1} ({2:0.00}s)", bytesWritten, memory.Length, timeDiff.TotalSeconds);
+                    Console.Write("\rBytes Written: {0}/{1} ({2:0.00}s)", bytesWritten, memory.Length, timeDiff.TotalSeconds);
                 }
-
+                if (bytesWritten > 0)
+				{
+                    Console.WriteLine();
+                }
+               
                 Console.WriteLine("Verifying");
                 con.WriteFlashEnd();
                 Console.WriteLine("OK");

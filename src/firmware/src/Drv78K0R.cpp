@@ -118,19 +118,31 @@ Drv78K0R::Result Drv78K0R::begin()
     // set baudrate (does not work for some reason?!)
     /*{
         // baudrate 115200
-        uint8_t buffer[] = { 0x9a, 0x00, 0x00, 0x0a, 0x00 };
+        uint8_t buffer[] = { 0x9a, 0x00, 0x00, 0x0a, 0x01 };
         sendCmd(buffer, sizeof(buffer));
-
-        delayMicroseconds(TFD3);
 
         Serial1.begin(115200);
         rxClear();
-        
-        // reset
+
+        uint8_t resetCmd[] = { 0x00 };
+
+        uint8_t retry = 16;
+        while(retry > 0)
         {
-            uint8_t buffer1[] = { 0x00 };
-            sendCmd(buffer1, sizeof(buffer1));
-            readResponse(TWT_DEFAULT);
+            delayMicroseconds(66);
+                
+            sendCmd(resetCmd, sizeof(resetCmd));
+            if (readStatusResponse(TWT_DEFAULT) != ERROR_TIMEOUT)
+            {
+                break;
+            }
+
+            retry--;
+        }
+
+        if (retry == 0)
+        {
+            return ERROR_TIMEOUT;
         }
     }*/
 
@@ -312,6 +324,7 @@ uint8_t Drv78K0R::readResponse(uint32_t timeout_ms)
     while(i < (len + 4) && millis() - now < timeout_ms)
     {
         int b = Serial1.read();
+        
         if (!err && b != -1)
         {
             if (i == 0 && b != STX)
