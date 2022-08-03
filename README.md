@@ -9,18 +9,21 @@ I do not know if this is compatible with the modern Renesas 78K0R series MCU:s, 
 
 ## Usage
 You will need an Arduino board with > 1 Serial port to run this flashing firmware.
-I'm using Arduino Micro which has one physical UART and another virtual port on the USB connection.
+Arduino Micro was used during the development of this project which has one physical UART and another virtual port on the USB connection.
 
 The physical port (Serial1) is used for communication with the MCU.
-The virtual port (Serial) is used for communication with the computer (flashing tool).
+The virtual port (Serial) is used for communication with the computer (flash tool).
 
-You need to make the following connections to the Renesas MCU.
+You need to make the following connections to the Renesas MCU:
 
-TOOL0 -> RX & TX of Serial (Connect to both joining them together)  
-RESET -> D9  
-FLMD  -> D10  
-GND -> GND  
-5V -> 5V (Only if Renesas MCU is not powered by other circuit)
+Arduino | Renesas MCU | Comment
+------- | ----------- | -------
+RX      | TOOL0       | Single wire UART
+TX      | TOOL0       | Single wire UART
+D9      | RESET       |
+D10     | FLMD        | 
+GND     | GND         |
++5V     | +5V         | Only if Renesas MCU is not powered by other circuit
 
 You can change the pins in firmware/Config.h if needed.
 
