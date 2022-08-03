@@ -1,10 +1,5 @@
 #include "Drv78K0R.h"
-
 #include <Arduino.h>
-
-
-#define PIN_RX          0
-#define PIN_TX          1
 
 #define ETX             0x03
 #define SOH             0x01
@@ -23,34 +18,6 @@
 
 #define TFD3            145     // microseconds
 
-#ifndef cbi
-#define cbi(sfr, bit) (_SFR_BYTE(sfr) &= ~_BV(bit))
-#endif
-#ifndef sbi
-#define sbi(sfr, bit) (_SFR_BYTE(sfr) |= _BV(bit))
-#endif
-
-
-static void txEnable(bool enable)
-{
-    if (enable)
-    {
-        pinMode(PIN_TX, OUTPUT);
-        sbi(UCSR1B, TXEN1);
-    }
-    else
-    {
-        Serial1.flush();
-        cbi(UCSR1B, TXEN1);
-        pinMode(PIN_TX, INPUT_PULLUP);
-    }
-}
-
-static void rxClear()
-{
-     while (Serial1.available()) Serial1.read();
-}
-
 static uint8_t checksum(const uint8_t* buf, uint16_t length)
 {
 	uint8_t value = 0;
@@ -66,43 +33,41 @@ static uint8_t checksum(const uint8_t* buf, uint16_t length)
 }
 
 
-
-Drv78K0R::Drv78K0R(int pinFLMD, int pinReset)
-    : _pinFLMD(pinFLMD)
-    , _pinReset(pinReset)
+Drv78K0R::Drv78K0R(HardwareSerial& serial, int pinRESET, int pinFLMD)
+    : _serial(serial)
+    , _pinReset(pinRESET)
+    , _pinFlmd(pinFLMD)
 {
     memset(_deviceId, 0, 10);
 
-    pinMode(_pinFLMD, OUTPUT);
+    pinMode(_pinFlmd, OUTPUT);
     pinMode(_pinReset, OUTPUT);
-    pinMode(PIN_RX, INPUT);
-    pinMode(PIN_TX, INPUT_PULLUP);
 
-    digitalWrite(_pinFLMD, HIGH);
+    digitalWrite(_pinFlmd, HIGH);
     digitalWrite(_pinReset, HIGH);
 }
 
 
 Drv78K0R::Result Drv78K0R::begin()
 {  
-    Serial1.end();
+    _serial.end();
 
-    digitalWrite(_pinFLMD, LOW);
+    digitalWrite(_pinFlmd, LOW);
 	digitalWrite(_pinReset, LOW);  
 
 	delay(10);  
-	digitalWrite(_pinFLMD, HIGH);
+	digitalWrite(_pinFlmd, HIGH);
 
-    Serial1.begin(9600);
+    _serial.begin(9600);
 
 	delay(10);
 	digitalWrite(_pinReset, HIGH);  
 
 	delay(10);  
-	Serial1.write(0);
+	_serial.write(0);
 
 	delay(2);  
-	Serial1.write(0);
+	_serial.write(0);
 
     delay(10);
 
@@ -121,7 +86,7 @@ Drv78K0R::Result Drv78K0R::begin()
         uint8_t buffer[] = { 0x9a, 0x00, 0x00, 0x0a, 0x01 };
         sendCmd(buffer, sizeof(buffer));
 
-        Serial1.begin(115200);
+        UART_TOOL0.begin(115200);
         rxClear();
 
         uint8_t resetCmd[] = { 0x00 };
@@ -160,12 +125,15 @@ Drv78K0R::Result Drv78K0R::begin()
 
 void Drv78K0R::end()
 {
-    Serial1.end();
+    _serial.end();
 
     digitalWrite(_pinReset, LOW);
-    digitalWrite(_pinFLMD, LOW);
+    digitalWrite(_pinFlmd, LOW);
 
     digitalWrite(_pinReset, HIGH);
+
+    memset(_deviceId, 0, 10);
+    _flashSize = 0;
 }
 
 uint32_t Drv78K0R::getFlashSize() const
@@ -216,29 +184,15 @@ Drv78K0R::Result Drv78K0R::writeFlash(uint8_t* data, uint16_t len)
 
     bool isLast = _bytesLeftToWrite <= 0;
 
-    txEnable(true);
+    _serial.write(STX);
+    _serial.write((uint8_t)len);
+    _serial.write(data, len);
+	_serial.write(checksum(data, len));
+    _serial.write(isLast ? ETX : ETB);
 
-    Serial1.write(STX);
-    Serial1.write((uint8_t)len);
-    Serial1.write(data, len);
-	Serial1.write(checksum(data, len));
-    Serial1.write(isLast ? ETX : ETB);
+    flush();
 
-    txEnable(false); // forces tx flush 
-    rxClear();
-
-    Result2 res = readStatusResponse2(TWT4_MAX);
-
-    if (res.a != ERROR_NONE)
-    {
-        return res.a;
-    }
-    else if (res.b != ERROR_NONE)
-    {
-        return res.b;
-    }
-
-    return ERROR_NONE;
+    return readStatusResponse2(TWT4_MAX);
 }
 
 Drv78K0R::Result Drv78K0R::endWrite()
@@ -250,16 +204,13 @@ Drv78K0R::Result Drv78K0R::endWrite()
 
 void Drv78K0R::sendCmd(const uint8_t* buffer, uint8_t length)
 {
-    txEnable(true);
+    _serial.write(SOH);
+    _serial.write(length);
+    _serial.write(buffer, length);
+	_serial.write(checksum(buffer, length));
+    _serial.write(ETX);
 
-    Serial1.write(SOH);
-    Serial1.write(length);
-    Serial1.write(buffer, length);
-	Serial1.write(checksum(buffer, length));
-    Serial1.write(ETX);
-
-    txEnable(false); // forces tx flush 
-    rxClear();
+    flush();
 }
 
 
@@ -273,14 +224,23 @@ Drv78K0R::Result Drv78K0R::readStatusResponse(uint32_t timeout_ms)
     return ERROR_TIMEOUT;
 }
 
-Drv78K0R::Result2 Drv78K0R::readStatusResponse2(uint32_t timeout_ms)
+Drv78K0R::Result Drv78K0R::readStatusResponse2(uint32_t timeout_ms)
 {
     if (readResponse(timeout_ms) == 6)
     {
-        return { (Result)_msgbuf[2], (Result)_msgbuf[3] };
+        if (_msgbuf[2] != ERROR_NONE)
+        {
+            return (Result)_msgbuf[2];
+        }
+        else if (_msgbuf[3] != ERROR_NONE)
+        {
+            return (Result)_msgbuf[3];
+        }
+
+        return ERROR_NONE;
     }
 
-    return { ERROR_TIMEOUT, ERROR_TIMEOUT };
+    return ERROR_TIMEOUT;
 }
 
 Drv78K0R::Result Drv78K0R::readSiliconSignatureResponse()
@@ -323,7 +283,7 @@ uint8_t Drv78K0R::readResponse(uint32_t timeout_ms)
     bool err = false;
     while(i < (len + 4) && millis() - now < timeout_ms)
     {
-        int b = Serial1.read();
+        int b = _serial.read();
         
         if (!err && b != -1)
         {
@@ -363,4 +323,12 @@ uint8_t Drv78K0R::readResponse(uint32_t timeout_ms)
     }
 
     return i;
+}
+
+void Drv78K0R::flush()
+{
+    // flush tx and discard any data in rx buf, 
+    // expecting response from MCU to arrive
+    _serial.flush(); 
+    while (_serial.available()) _serial.read();
 }

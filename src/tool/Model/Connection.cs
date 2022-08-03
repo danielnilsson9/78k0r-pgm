@@ -51,7 +51,7 @@ namespace _78k0r_pgm.Model
 		public Connection(string comPort)
 		{
 			DeviceId = "";
-			_port = new SerialPort(comPort, 9600, Parity.None, 8, StopBits.One);
+			_port = new SerialPort(comPort, 115200, Parity.None, 8, StopBits.One);
 			_port.Handshake = Handshake.None;
 			_port.DtrEnable = true; // Needed for USB CDC ?!
 			_port.RtsEnable = true; // Needed for USB CDC ?!

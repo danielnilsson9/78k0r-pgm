@@ -1,5 +1,6 @@
 #include <Arduino.h>
 #include "Drv78K0R.h"
+#include "Config.h"
 
 #define STX             0xf1
 #define ETX             0xf2
@@ -56,17 +57,15 @@
 #define STATUS_ERROR_BUSY               8
 
 
-#define PIN_RESET       9
-#define PIN_FLMD        10
 
-Drv78K0R drv78k0r(PIN_FLMD, PIN_RESET);
+Drv78K0R drv78k0r(DRV78K0R_UART, DRV78K0R_PIN_RESET, DRV78K0R_PIN_FLMD);
 uint8_t rxbuf[300];
 
 void setup()
 {
     pinMode(LED_BUILTIN, OUTPUT);
 
-    Serial.begin(9600);
+    Serial.begin(115200);
     while(!Serial);
 }
 
@@ -108,7 +107,7 @@ uint8_t receiveCmd()
     uint16_t len = 0;
     bool err = false;
 
-    while(i < (len + 4) /* && millis() - lastRecv < 1000 */)
+    while(i < (len + 4) && millis() - lastRecv < 1000)
     {
         int b = Serial.read();
 

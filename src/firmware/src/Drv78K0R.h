@@ -1,3 +1,6 @@
+#ifndef DRV78K0R_H
+#define DRV78K0R_H
+
 #include <Arduino.h>
 
 class Drv78K0R
@@ -21,7 +24,7 @@ public:
         ERROR_BUSY = 0xff     
     };
 
-    Drv78K0R(int pinFLMD, int pinReset);
+    Drv78K0R(HardwareSerial& serial, int pinRESET, int pinFLMD);
 
     Result begin();
     void end();
@@ -36,22 +39,20 @@ public:
     Result endWrite();
  
 private:
-    struct Result2
-    {
-        Result a;
-        Result b;
-    };
-
     void sendCmd(const uint8_t* buffer, uint8_t length);
 
     Result readStatusResponse(uint32_t timeout_ms);
-    Result2 readStatusResponse2(uint32_t timeout_ms);
+    Result readStatusResponse2(uint32_t timeout_ms);
     Result readSiliconSignatureResponse();
     uint8_t readResponse(uint32_t timeout_ms);
 
+    void flush();
+
 private:
-    int _pinFLMD;
+    HardwareSerial& _serial;
     int _pinReset;
+    int _pinFlmd;
+
     uint8_t _msgbuf[64];
 
     char _deviceId[DEVICE_ID_LENGTH];
@@ -59,3 +60,5 @@ private:
     int32_t _blockToWrite = 0;
     int32_t _bytesLeftToWrite = 0;
 };
+
+#endif
