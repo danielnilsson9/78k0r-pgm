@@ -16,8 +16,8 @@ The virtual port (Serial) is used for communication with the computer (flashing 
 
 You need to make three connections to the Renesas MCU.
 
-TOOL0 -> RX & TX of Serial (Connect to both joinig them together)
-RESET -> D9
+TOOL0 -> RX & TX of Serial (Connect to both joinig them together)  
+RESET -> D9  
 FLMD  -> D10
 
 You can change the pins in the firmware in Config.h if needed.
